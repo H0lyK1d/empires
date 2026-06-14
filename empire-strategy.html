@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Empire — World Conquest</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a2744;font-family:'Segoe UI',system-ui,sans-serif}
+#c{display:block;position:absolute;top:0;left:0;cursor:crosshair}
+
+/* ── HUD BOTTOM ── */
+#hud{position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:50;pointer-events:none;display:none}
+#hud-inner{background:rgba(8,12,24,0.93);border:1px solid rgba(255,255,255,0.1);border-bottom:none;border-radius:14px 14px 0 0;padding:10px 22px 10px;display:flex;align-items:center;gap:20px;pointer-events:all;backdrop-filter:blur(10px);box-shadow:0 -4px 24px rgba(0,0,0,0.5)}
+.hstat{display:flex;flex-direction:column;align-items:center;min-width:64px}
+.hstat-lbl{font-size:8.5px;color:rgba(255,255,255,0.35);letter-spacing:1.4px;text-transform:uppercase;margin-bottom:2px}
+.hstat-val{font-size:16px;font-weight:800;color:#fff;line-height:1;letter-spacing:-0.3px}
+.hstat-val.gold{color:#fbbf24}
+.hstat-val.troops{color:#4ade80}
+.hstat-val.terr{color:#60a5fa}
+.hstat-val.gps{color:#fbbf2488;font-size:12px;font-weight:600}
+.hdiv{width:1px;height:40px;background:rgba(255,255,255,0.08);flex-shrink:0}
+#slider-block{display:flex;flex-direction:column;gap:5px;min-width:200px}
+.slider-row{display:flex;justify-content:space-between;align-items:center}
+.slider-lbl{font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase}
+#sliderPct{font-size:13px;font-weight:700;color:#4ade80}
+#troopSlider{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.12);border-radius:2px;cursor:pointer;outline:none}
+#troopSlider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#4ade80;cursor:pointer;box-shadow:0 0 8px rgba(74,222,128,0.5)}
+#sendCount{font-size:11px;color:rgba(74,222,128,0.65);text-align:center}
+#eraTag{font-size:9px;color:rgba(255,200,80,0.6);font-style:italic;text-align:center;letter-spacing:.5px;margin-top:1px}
+
+/* ── LEADERBOARD ── */
+#lb{position:fixed;top:12px;left:12px;z-index:50;display:none;width:250px}
+#lb-inner{background:rgba(8,12,24,0.9);border:1px solid rgba(255,255,255,0.09);border-radius:10px;overflow:hidden;backdrop-filter:blur(8px)}
+#lb-title{padding:8px 14px;font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;gap:6px;align-items:center}
+.lb-row{padding:5px 14px;display:grid;grid-template-columns:18px 1fr 52px 52px;gap:6px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.03);transition:background .1s}
+.lb-row.me{background:rgba(74,222,128,0.06)}
+.lb-rank{font-size:9px;color:rgba(255,255,255,0.25);font-weight:700}
+.lb-name{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-v{font-size:10px;color:rgba(255,255,255,0.45);text-align:right}
+
+/* ── TOOLBAR ── */
+#toolbar{position:fixed;top:12px;right:12px;z-index:50;display:none;flex-direction:column;gap:7px}
+.tbtn{background:rgba(8,12,24,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 16px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);cursor:pointer;backdrop-filter:blur(6px);transition:all .15s;white-space:nowrap;letter-spacing:.3px}
+.tbtn:hover,.tbtn.on{border-color:rgba(96,165,250,0.5);color:#93c5fd;background:rgba(96,165,250,0.08)}
+
+/* ── SIDE PANELS ── */
+.panel{position:fixed;top:0;bottom:0;width:270px;background:rgba(6,10,20,0.97);border:1px solid rgba(255,255,255,0.07);z-index:60;display:flex;flex-direction:column;transition:transform .22s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(12px)}
+#resPanel{right:0;border-right:none;transform:translateX(100%)}
+#resPanel.open{transform:none}
+#bldPanel{left:0;border-left:none;transform:translateX(-100%)}
+#bldPanel.open{transform:none}
+.panel-hd{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;font-weight:700;color:#e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.panel-close{background:none;border:none;color:rgba(255,255,255,0.3);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.panel-close:hover{color:#fff;background:rgba(255,255,255,0.08)}
+.panel-body{flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent}
+
+/* Research nodes */
+.rbranch-title{font-size:8.5px;color:rgba(255,255,255,0.25);letter-spacing:1.8px;text-transform:uppercase;padding:10px 0 6px;margin-bottom:2px}
+.rnode{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:9px 11px;margin-bottom:5px;cursor:pointer;transition:all .15s;position:relative}
+.rnode:hover:not(.rdone):not(.rlocked){border-color:rgba(96,165,250,0.4);background:rgba(96,165,250,0.06)}
+.rnode.rdone{border-color:rgba(74,222,128,0.25);background:rgba(74,222,128,0.04);cursor:default}
+.rnode.ractive{border-color:rgba(251,191,36,0.45);background:rgba(251,191,36,0.05)}
+.rnode.rlocked{opacity:.3;cursor:default}
+.rn-name{font-size:12px;font-weight:700;color:#e2e8f0}
+.rn-desc{font-size:10px;color:rgba(255,255,255,0.32);margin-top:2px}
+.rn-meta{font-size:10px;color:#fbbf24;margin-top:4px}
+.rn-bar{height:2px;background:rgba(255,255,255,0.08);border-radius:1px;margin-top:6px}
+.rn-fill{height:100%;background:#fbbf24;border-radius:1px}
+
+/* Building items */
+.bld-item{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:9px 11px;margin-bottom:5px;cursor:grab;display:flex;align-items:center;gap:11px;transition:border-color .15s}
+.bld-item:hover{border-color:rgba(251,191,36,0.4);background:rgba(251,191,36,0.05)}
+.bld-item:active{cursor:grabbing}
+.bi-art{width:36px;height:36px;image-rendering:pixelated;flex-shrink:0;border-radius:4px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.bi-name{font-size:12px;font-weight:700;color:#e2e8f0}
+.bi-cost{font-size:10px;color:#fbbf24;margin-top:1px}
+.bi-eff{font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px}
+
+/* ── MODAL ── */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:200}
+.mbox{background:linear-gradient(160deg,#0d1628 0%,#0a1020 100%);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:48px 44px;text-align:center;width:400px;max-width:92vw;box-shadow:0 32px 80px rgba(0,0,0,0.8)}
+.mbox-icon{font-size:44px;margin-bottom:14px;display:block}
+.mbox h1{font-size:32px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:4px}
+.mbox .sub{font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:36px}
+.mbox input{width:100%;padding:13px 18px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-size:16px;text-align:center;outline:none;margin-bottom:14px;font-family:inherit;transition:border-color .15s}
+.mbox input:focus{border-color:rgba(74,222,128,0.5);background:rgba(74,222,128,0.04)}
+.mbox input::placeholder{color:rgba(255,255,255,0.18)}
+.mbox button{width:100%;background:linear-gradient(135deg,#166534,#14532d);color:#4ade80;border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;letter-spacing:.3px}
+.mbox button:hover{background:linear-gradient(135deg,#15803d,#166534);border-color:rgba(74,222,128,0.5);box-shadow:0 0 24px rgba(74,222,128,0.2)}
+
+/* ── TOOLTIP ── */
+#tip{position:fixed;background:rgba(8,12,24,0.95);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 12px;font-size:11px;color:#e2e8f0;z-index:300;pointer-events:none;display:none;backdrop-filter:blur(4px);max-width:220px;text-align:center}
+
+/* ── ATTACK FLASH ── */
+#attackFlash{position:fixed;inset:0;background:rgba(255,60,60,0.06);pointer-events:none;z-index:40;opacity:0;transition:opacity .3s}
+
+/* ── LOADING INDICATOR ── */
+.loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;color:#4ade80;font-size:24px}
+.loading::after{content:'';animation:dots 1.5s steps(4,end) infinite}
+@keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%{content:'...'}80%,100%{content:''}}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="attackFlash"></div>
+<div id="loading" class="loading">Loading world</div>
+
+<!-- MODAL -->
+<div id="modal">
+<div class="mbox">
+  <span class="mbox-icon">⚔</span>
+  <h1>World Conquest</h1>
+  <p class="sub">Build your empire and dominate the globe</p>
+  <input id="nameIn" placeholder="Name your empire..." maxlength="24">
+  <button id="startBtn">Begin Conquest</button>
+</div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="lb"><div id="lb-inner">
+  <div id="lb-title">🏆 <span style="flex:1">Leaderboard</span> <span id="scoreSpan" style="color:#fbbf24;font-size:10px">Score: 0</span></div>
+  <div id="lbRows"></div>
+</div></div>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <button class="tbtn" id="btnBld">🏗 Buildings</button>
+  <button class="tbtn" id="btnRes">🔬 Research</button>
+</div>
+
+<!-- HUD -->
+<div id="hud"><div id="hud-inner">
+  <div class="hstat">
+    <span class="hstat-lbl">Gold</span>
+    <span class="hstat-val gold" id="hGold">200</span>
+    <span class="hstat-val gps" id="hGps">+2/s</span>
+  </div>
+  <div class="hdiv"></div>
+  <div id="slider-block">
+    <div class="slider-row">
+      <span class="slider-lbl">Troops to Send</span>
+      <span id="sliderPct" style="font-size:13px;font-weight:700;color:#4ade80">50%</span>
+    </div>
+    <input type="range" id="troopSlider" min="1" max="100" value="50">
+    <div id="sendCount">Sending: 50</div>
+  </div>
+  <div class="hdiv"></div>
+  <div class="hstat">
+    <span class="hstat-lbl">Troops</span>
+    <span class="hstat-val troops" id="hTrp">100</span>
+    <span class="hstat-val gps" id="hSps">+0.5/s</span>
+  </div>
+  <div class="hstat">
+    <span class="hstat-lbl">Territory</span>
+    <span class="hstat-val terr" id="hTerr">0.0%</span>
+  </div>
+  <div class="hstat">
+    <span class="hstat-lbl">Era</span>
+    <span id="eraTag">Primitive</span>
+  </div>
+</div></div>
+
+<!-- RESEARCH PANEL -->
+<div class="panel" id="resPanel">
+  <div class="panel-hd">🔬 Research Tree<button class="panel-close" id="resClose">✕</button></div>
+  <div class="panel-body" id="resBody"></div>
+</div>
+
+<!-- BUILDING PANEL -->
+<div class="panel" id="bldPanel">
+  <div class="panel-hd">🏗 Buildings<button class="panel-close" id="bldClose">✕</button></div>
+  <div class="panel-body" id="bldBody"></div>
+</div>
+
+<div id="tip"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const MW=512, MH=256;
+const TILE_SIZE = 8; // 512/64 = 8px per tile in canvas
+const GRID_W = 64, GRID_H = 32;
+
+// Map data - procedurally generated or loaded
+let mapData = null;
+let landMask = null;
+
+// ═══════════════════════════════════════════════════════════
+// GENERATE SIMPLE WORLD MAP
+// ═══════════════════════════════════════════════════════════
+function generateWorldMap() {
+  mapData = new Uint8ClampedArray(GRID_W * GRID_H);
+  
+  // Simple continent generation using noise-like approach
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      // Distance from equator (y = GRID_H/2)
+      const latDist = Math.abs(y - GRID_H/2);
+      // Simple landmass distribution
+      const base = Math.sin((x / GRID_W) * Math.PI * 2) * 0.3 + 0.4;
+      const latitude = Math.cos((latDist / (GRID_H/2)) * Math.PI * 0.5) * 0.5 + 0.3;
+      const val = (base + latitude) * (1 - Math.random() * 0.2);
+      
+      mapData[y * GRID_W + x] = val > 0.5 ? 1 : 0; // 1 = land, 0 = sea
+    }
+  }
+  
+  return mapData;
+}
+
+// ═══════════════════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════════════════
+const game = {
+  playerName: '',
+  gold: 200,
+  troops: 100,
+  territory: 0,
+  era: 0, // 0=Primitive, 1=Medieval, 2=Industrial, 3=Modern
+  tiles: {}, // {key: {owner, troops, buildings:[]}}
+  buildings: {},
+  sendPercent: 50,
+  selectedTile: null,
+};
+
+const eras = ['Primitive', 'Medieval', 'Industrial', 'Modern'];
+const eraColors = ['#8B7355', '#CD853F', '#FF8C00', '#FFD700'];
+
+// ═══════════════════════════════════════════════════════════
+// BUILDING DEFINITIONS
+// ═══════════════════════════════════════════════════════════
+const BUILDINGS = {
+  barracks: {
+    name: 'Barracks', emoji: '🏛', cost: 50, produces: 'troops', productionRate: 0.5,
+    desc: 'Trains soldiers', icon: '🏛'
+  },
+  farm: {
+    name: 'Farm', emoji: '🌾', cost: 30, produces: 'gold', productionRate: 1,
+    desc: 'Generates gold', icon: '🌾'
+  },
+  harbor: {
+    name: 'Harbor', emoji: '⚓', cost: 100, produces: 'navy', productionRate: 0.3,
+    desc: 'Builds warships for sea conquest', icon: '⚓'
+  },
+  fortification: {
+    name: 'Fortification', emoji: '🏰', cost: 80, produces: 'defense', productionRate: 2,
+    desc: 'Defends territory', icon: '🏰'
+  },
+  warehouse: {
+    name: 'Warehouse', emoji: '📦', cost: 40, produces: 'storage', productionRate: 1,
+    desc: 'Increases storage capacity', icon: '📦'
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS & RENDERING
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = MW;
+canvas.height = MH;
+
+function drawMap() {
+  if (!mapData) return;
+  
+  ctx.fillStyle = '#1a3a52'; // Sea
+  ctx.fillRect(0, 0, MW, MH);
+  
+  // Draw land tiles
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const idx = y * GRID_W + x;
+      const isLand = mapData[idx] === 1;
+      
+      if (isLand) {
+        const tileKey = `${x},${y}`;
+        const tile = game.tiles[tileKey];
+        
+        if (tile) {
+          // Owned territory
+          const col = tile.owner === 'player' ? '#4ade80' : '#ef4444';
+          ctx.fillStyle = col;
+          ctx.globalAlpha = 0.7;
+          ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          ctx.globalAlpha = 1;
+          
+          // Draw troops count
+          if (tile.troops > 0) {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 8px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(tile.troops, x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2);
+          }
+        } else {
+          // Unclaimed land
+          ctx.fillStyle = '#9ca3af';
+          ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+        
+        // Border
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONQUEST MECHANICS
+// ═══════════════════════════════════════════════════════════
+function getTileKey(x, y) {
+  return `${x},${y}`;
+}
+
+function isLand(x, y) {
+  if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return false;
+  return mapData[y * GRID_W + x] === 1;
+}
+
+function getAdjacentLandTiles(x, y) {
+  const adjacent = [];
+  const dirs = [[0,-1],[1,0],[0,1],[-1,0]]; // N, E, S, W
+  for (const [dx, dy] of dirs) {
+    const nx = x + dx, ny = y + dy;
+    if (isLand(nx, ny)) {
+      adjacent.push({x: nx, y: ny});
+    }
+  }
+  return adjacent;
+}
+
+function canConquerTile(x, y) {
+  if (!isLand(x, y)) return false;
+  
+  const tileKey = getTileKey(x, y);
+  if (game.tiles[tileKey]?.owner === 'player') return false; // Already owned
+  
+  // Check if adjacent to player territory
+  const adjacent = getAdjacentLandTiles(x, y);
+  return adjacent.some(adj => {
+    const adjKey = getTileKey(adj.x, adj.y);
+    return game.tiles[adjKey]?.owner === 'player';
+  });
+}
+
+function slowlyConquerTile(x, y, troopsAvailable) {
+  if (!canConquerTile(x, y)) return 0;
+  
+  const tileKey = getTileKey(x, y);
+  const tile = game.tiles[tileKey];
+  
+  // Slow conquest: 1 troop per turn conquers 0.1% of a tile
+  const conquestRate = 0.01; // Per turn per troop
+  const troopsUsed = Math.min(troopsAvailable, 10); // Max 10 troops per tile per turn
+  const progressGain = troopsUsed * conquestRate;
+  
+  if (!tile) {
+    game.tiles[tileKey] = {owner: 'player', troops: 0, conquest: 0, buildings: []};
+  }
+  
+  game.tiles[tileKey].conquest = (game.tiles[tileKey].conquest || 0) + progressGain;
+  
+  if (game.tiles[tileKey].conquest >= 1) {
+    game.tiles[tileKey].conquest = 0;
+    game.tiles[tileKey].owner = 'player';
+    game.tiles[tileKey].troops = 5; // Starting garrison
+  }
+  
+  return troopsUsed;
+}
+
+function sendTroopsToConquer(x, y) {
+  if (!canConquerTile(x, y)) return;
+  
+  const troopsToSend = Math.floor(game.troops * (game.sendPercent / 100));
+  if (troopsToSend <= 0) return;
+  
+  game.troops -= troopsToSend;
+  
+  // Deploy conquest gradually
+  const interval = setInterval(() => {
+    if (troopsToSend <= 0) {
+      clearInterval(interval);
+      return;
+    }
+    const used = slowlyConquerTile(x, y, troopsToSend);
+  }, 500); // Conquest tick every 500ms
+}
+
+// ═══════════════════════════════════════════════════════════
+// MOUSE INTERACTION
+// ═══════════════════════════════════════════════════════════
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / MW));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / MH));
+  
+  const gridX = Math.floor(x / TILE_SIZE);
+  const gridY = Math.floor(y / TILE_SIZE);
+  
+  if (isLand(gridX, gridY)) {
+    const tileKey = getTileKey(gridX, gridY);
+    const tile = game.tiles[tileKey];
+    
+    if (!tile || tile.owner !== 'player') {
+      // Start conquest if adjacent to player territory
+      if (canConquerTile(gridX, gridY)) {
+        sendTroopsToConquer(gridX, gridY);
+      }
+    } else {
+      // Select player tile
+      game.selectedTile = {x: gridX, y: gridY};
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════════════════════
+let lastUpdate = Date.now();
+
+function update() {
+  const now = Date.now();
+  const dt = (now - lastUpdate) / 1000;
+  lastUpdate = now;
+  
+  // Update resources
+  let goldGeneration = 0;
+  let troopGeneration = 0;
+  let totalTerritoryTiles = 0;
+  
+  for (const key in game.tiles) {
+    const tile = game.tiles[key];
+    if (tile.owner === 'player') {
+      totalTerritoryTiles++;
+      
+      // Generate resources from buildings
+      for (const bld of tile.buildings) {
+        const def = BUILDINGS[bld.type];
+        if (def.produces === 'gold') {
+          goldGeneration += def.productionRate * dt;
+        } else if (def.produces === 'troops') {
+          troopGeneration += def.productionRate * dt;
+        }
+      }
+    }
+  }
+  
+  game.gold += goldGeneration;
+  game.troops += troopGeneration;
+  game.territory = (totalTerritoryTiles / (GRID_W * GRID_H)) * 100;
+  
+  // Update HUD
+  document.getElementById('hGold').textContent = Math.floor(game.gold);
+  document.getElementById('hGps').textContent = `+${goldGeneration.toFixed(1)}/s`;
+  document.getElementById('hTrp').textContent = Math.floor(game.troops);
+  document.getElementById('hSps').textContent = `+${troopGeneration.toFixed(1)}/s`;
+  document.getElementById('hTerr').textContent = game.territory.toFixed(1) + '%';
+  
+  drawMap();
+  requestAnimationFrame(update);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════
+function initGame() {
+  document.getElementById('modal').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('toolbar').style.display = 'flex';
+  document.getElementById('lb').style.display = 'block';
+  
+  // Start at a random land tile
+  let started = false;
+  for (let attempts = 0; attempts < 100 && !started; attempts++) {
+    const x = Math.floor(Math.random() * GRID_W);
+    const y = Math.floor(Math.random() * GRID_H);
+    if (isLand(x, y)) {
+      const tileKey = getTileKey(x, y);
+      game.tiles[tileKey] = {owner: 'player', troops: 20, buildings: []};
+      started = true;
+    }
+  }
+  
+  update();
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  game.playerName = document.getElementById('nameIn').value || 'Empire';
+  if (game.playerName) {
+    initGame();
+  }
+});
+
+// Generate map on load
+window.addEventListener('load', () => {
+  generateWorldMap();
+  document.getElementById('loading').style.display = 'none';
+});
+
+// Panel controls
+document.getElementById('btnBld').addEventListener('click', () => {
+  document.getElementById('bldPanel').classList.toggle('open');
+});
+
+document.getElementById('btnRes').addEventListener('click', () => {
+  document.getElementById('resPanel').classList.toggle('open');
+});
+
+document.getElementById('bldClose').addEventListener('click', () => {
+  document.getElementById('bldPanel').classList.remove('open');
+});
+
+document.getElementById('resClose').addEventListener('click', () => {
+  document.getElementById('resPanel').classList.remove('open');
+});
+
+// Slider update
+document.getElementById('troopSlider').addEventListener('input', (e) => {
+  game.sendPercent = parseInt(e.target.value);
+  document.getElementById('sliderPct').textContent = game.sendPercent + '%';
+  document.getElementById('sendCount').textContent = `Sending: ${Math.floor(game.troops * (game.sendPercent / 100))}`;
+});
+
+</script>
+</body>
+</html>
